@@ -1,0 +1,54 @@
+<div class="login-shell">
+	<div class="login-card">
+		<div class="login-brand">
+			<span class="eyebrow">School Timetable Creator</span>
+			<h1>AMUPS Portal</h1>
+			<p>Sign in to access your admin or teacher portal.</p>
+		</div>
+
+		<form class="login-form" (ngSubmit)="login()">
+			<label>
+				<span>Portal</span>
+				<select [(ngModel)]="loginRole" name="role">
+					<option value="admin">Admin portal</option>
+					<option value="teacher">Teacher portal</option>
+				</select>
+			</label>
+
+			<label>
+				<span>Email</span>
+				<input
+					[(ngModel)]="loginEmail"
+					name="email"
+					type="email"
+					placeholder="name@school.edu"
+					autocomplete="email"
+					required
+				/>
+			</label>
+
+			<label>
+				<span>Password</span>
+				<input
+					[(ngModel)]="loginPassword"
+					name="password"
+					type="password"
+					placeholder="Password"
+					autocomplete="current-password"
+					required
+				/>
+			</label>
+
+			@if (planner.errorMessage()) {
+				<p class="error-msg">{{ planner.errorMessage() }}</p>
+			}
+
+			<div class="login-actions">
+				<button type="submit" class="primary-button" [disabled]="loading()">
+					{{ loading() ? 'Signing in…' : 'Sign in' }}
+				</button>
+				<button type="button" class="ghost-button" (click)="fillDemo()">Use demo</button>
+			</div>
+		</form>
+	</div>
+</div>

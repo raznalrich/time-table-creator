@@ -1,0 +1,539 @@
+<main class="shell">
+
+  <!-- Top bar: user info + logout -->
+  <header class="topbar card">
+    <div class="topbar-brand">
+      <span class="eyebrow">AMUPS</span>
+      <strong>School Timetable</strong>
+    </div>
+    <div class="topbar-user">
+      @if (currentUser(); as user) {
+        <span class="role-badge">{{ user.role }} portal</span>
+        <span class="topbar-name">{{ user.name }}</span>
+        <button type="button" class="ghost-button" (click)="logout()">Log out</button>
+      }
+    </div>
+  </header>
+
+  @if (planner.errorMessage()) {
+    <section class="banner error">{{ planner.errorMessage() }}</section>
+  }
+
+  @if (planner.isSaving()) {
+    <section class="banner info">Saving timetable data...</section>
+  }
+
+  <!-- Day structure timeline -->
+  <section class="timeline card">
+    <div class="section-heading">
+      <div>
+        <span class="eyebrow">Day Structure</span>
+        <h2>Weekly bell timings</h2>
+      </div>
+      <p>Lunch closes at 1:40 PM on Friday, while the rest of the period grid stays identical across the week.</p>
+    </div>
+
+    <div class="timeline-grid">
+      @for (period of periods; track period.id) {
+        <article class="timeline-slot">
+          <span>{{ period.shortLabel }}</span>
+          <strong>{{ period.label }}</strong>
+          <small>{{ periodRange(period) }}</small>
+        </article>
+      }
+    </div>
+
+    <div class="break-grid">
+      @for (window of breaks; track window.label) {
+        <article class="break-chip">
+          <strong>{{ window.label }}</strong>
+          <span>{{ window.start }} - {{ window.end }}</span>
+          @if (window.fridayEnd) {
+            <small>Friday ends {{ window.fridayEnd }}</small>
+          }
+        </article>
+      }
+    </div>
+  </section>
+
+  <!-- Stats summary -->
+  <section class="stats-grid">
+    <article class="stat-card card">
+      <span>Classes</span>
+      <strong>{{ summary().classCount }}</strong>
+      <small>division-ready rooms</small>
+    </article>
+    <article class="stat-card card">
+      <span>Teachers</span>
+      <strong>{{ summary().teacherCount }}</strong>
+      <small>portal accounts supported</small>
+    </article>
+    <article class="stat-card card">
+      <span>Subjects</span>
+      <strong>{{ summary().subjectCount }}</strong>
+      <small>teacher allocations tracked</small>
+    </article>
+    <article class="stat-card card accent">
+      <span>Scheduled load</span>
+      <strong>{{ summary().scheduledHours | number:'1.1-1' }} h</strong>
+      <small>{{ summary().scheduledPeriods }} teaching slots this week</small>
+    </article>
+  </section>
+
+  <!-- Admin portal -->
+  @if (isAdmin()) {
+    <section class="section-nav card">
+      <button type="button" [class.active]="activeSection === 'overview'" (click)="activeSection = 'overview'">Setup</button>
+      <button type="button" [class.active]="activeSection === 'timetable'" (click)="activeSection = 'timetable'">Timetable editor</button>
+      <button type="button" [class.active]="activeSection === 'analytics'" (click)="activeSection = 'analytics'">Analytics</button>
+    </section>
+
+    @if (activeSection === 'overview') {
+      <section class="portal-grid">
+        <article class="card form-card">
+          <div class="section-heading compact">
+            <div>
+              <span class="eyebrow">Setup</span>
+              <h2>Add class and division</h2>
+            </div>
+          </div>
+          <div class="form-grid">
+            <label>
+              <span>Display name</span>
+              <input [(ngModel)]="classDraft.name" placeholder="Grade 9" />
+            </label>
+            <label>
+              <span>Grade</span>
+              <input [(ngModel)]="classDraft.grade" placeholder="9" />
+            </label>
+            <label>
+              <span>Division</span>
+              <input [(ngModel)]="classDraft.division" placeholder="A" />
+            </label>
+            <label>
+              <span>Strength</span>
+              <input [(ngModel)]="classDraft.strength" type="number" min="1" />
+            </label>
+            <label class="wide-field">
+              <span>Room label</span>
+              <input [(ngModel)]="classDraft.roomLabel" placeholder="Block C - 21" />
+            </label>
+          </div>
+          <button type="button" class="primary-button" (click)="saveClass()">Add class</button>
+        </article>
+
+        <article class="card form-card">
+          <div class="section-heading compact">
+            <div>
+              <span class="eyebrow">Setup</span>
+              <h2>Add teacher login</h2>
+            </div>
+          </div>
+          <div class="form-grid">
+            <label>
+              <span>Name</span>
+              <input [(ngModel)]="teacherDraft.name" placeholder="Teacher name" />
+            </label>
+            <label>
+              <span>Email</span>
+              <input [(ngModel)]="teacherDraft.email" type="email" placeholder="teacher@school.edu" />
+            </label>
+            <label>
+              <span>Teacher code</span>
+              <input [(ngModel)]="teacherDraft.teacherCode" placeholder="T-120" />
+            </label>
+            <label>
+              <span>Weekly capacity</span>
+              <input [(ngModel)]="teacherDraft.weeklyCapacity" type="number" min="1" />
+            </label>
+            <label class="wide-field">
+              <span>Demo password</span>
+              <input [(ngModel)]="teacherDraft.password" type="text" placeholder="teacher123" />
+            </label>
+          </div>
+          <button type="button" class="primary-button" (click)="saveTeacher()">Add teacher</button>
+        </article>
+
+        <article class="card form-card">
+          <div class="section-heading compact">
+            <div>
+              <span class="eyebrow">Setup</span>
+              <h2>Add subject and allot teacher</h2>
+            </div>
+          </div>
+          <div class="form-grid">
+            <label>
+              <span>Subject name</span>
+              <input [(ngModel)]="subjectDraft.name" placeholder="Physics" />
+            </label>
+            <label>
+              <span>Class</span>
+              <select [(ngModel)]="subjectDraft.classId">
+                @for (classroom of planner.classes(); track classroom.id) {
+                  <option [value]="classroom.id">{{ classLabel(classroom.id) }}</option>
+                }
+              </select>
+            </label>
+            <label>
+              <span>Teacher</span>
+              <select [(ngModel)]="subjectDraft.teacherId">
+                @for (teacher of planner.teachers(); track teacher.id) {
+                  <option [value]="teacher.id">{{ teacher.name }}</option>
+                }
+              </select>
+            </label>
+            <label>
+              <span>Weekly periods</span>
+              <input [(ngModel)]="subjectDraft.weeklyPeriods" type="number" min="1" max="8" />
+            </label>
+            <label>
+              <span>Colour</span>
+              <input [(ngModel)]="subjectDraft.color" type="color" />
+            </label>
+          </div>
+          <button type="button" class="primary-button" (click)="saveSubject()">Add subject</button>
+        </article>
+      </section>
+
+      <section class="roster-grid">
+        <article class="card">
+          <div class="section-heading compact">
+            <div>
+              <span class="eyebrow">Roster</span>
+              <h2>Classes with divisions</h2>
+            </div>
+          </div>
+          <div class="simple-list">
+            @for (classroom of planner.classes(); track classroom.id) {
+              <div class="simple-row">
+                <div class="row-info">
+                  <strong>{{ classLabel(classroom.id) }}</strong>
+                  <span>{{ classroom.strength }} students · {{ classroom.roomLabel }}</span>
+                </div>
+                <button type="button" class="delete-button" title="Delete class" (click)="deleteClass(classroom.id)">✕</button>
+              </div>
+            }
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="section-heading compact">
+            <div>
+              <span class="eyebrow">Roster</span>
+              <h2>Teachers</h2>
+            </div>
+          </div>
+          <div class="simple-list">
+            @for (teacher of planner.teachers(); track teacher.id) {
+              <div class="simple-row">
+                <div class="row-info">
+                  <strong>{{ teacher.name }}</strong>
+                  <span>{{ teacher.teacherCode }} · {{ teacher.email }}</span>
+                </div>
+                <button type="button" class="delete-button" title="Delete teacher" (click)="deleteTeacher(teacher.id)">✕</button>
+              </div>
+            }
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="section-heading compact">
+            <div>
+              <span class="eyebrow">Roster</span>
+              <h2>Subjects</h2>
+            </div>
+          </div>
+          <div class="simple-list">
+            @for (subject of planner.subjects(); track subject.id) {
+              <div class="simple-row">
+                <span class="subject-dot" [style.background]="subject.color"></span>
+                <div class="row-info">
+                  <strong>{{ subject.name }}</strong>
+                  <span>{{ classLabel(subject.classId) }} · {{ teacherName(subject.teacherId) }} · {{ subject.weeklyPeriods }}×/wk</span>
+                </div>
+                <button type="button" class="delete-button" title="Delete subject" (click)="deleteSubject(subject.id)">✕</button>
+              </div>
+            }
+          </div>
+        </article>
+      </section>
+    }
+
+    @if (activeSection === 'timetable') {
+      <section class="generate-bar card">
+        <div>
+          <span class="eyebrow">Auto-scheduler</span>
+          <p>Generate a conflict-free timetable for all classes at once. Teacher load is spread evenly across the week. Any existing schedule will be replaced.</p>
+        </div>
+        <button
+          type="button"
+          class="generate-button"
+          [disabled]="planner.isSaving()"
+          (click)="generateTimetable()"
+        >
+          {{ planner.isSaving() ? 'Generating…' : '⚡ Generate Timetable for All Classes' }}
+        </button>
+      </section>
+
+      <section class="card editor-card">
+        <div class="section-heading">
+          <div>
+            <span class="eyebrow">Admin portal</span>
+            <h2>Class-wise editable timetable</h2>
+          </div>
+          <label class="toolbar-select">
+            <span>Selected class</span>
+            <select [(ngModel)]="selectedClassId">
+              @for (classroom of planner.classes(); track classroom.id) {
+                <option [value]="classroom.id">{{ classLabel(classroom.id) }}</option>
+              }
+            </select>
+          </label>
+        </div>
+
+        <div class="table-wrap">
+          <table class="planner-table">
+            <thead>
+              <tr>
+                <th>Period</th>
+                @for (day of days; track day) {
+                  <th>{{ day }}</th>
+                }
+              </tr>
+            </thead>
+            <tbody>
+              @for (period of periods; track period.id) {
+                <tr>
+                  <th>
+                    <strong>{{ period.shortLabel }}</strong>
+                    <span>{{ periodRange(period) }}</span>
+                  </th>
+                  @for (day of days; track day) {
+                    <td [style.--cell-accent]="subjectColor(entrySubjectId(day, period.id))">
+                      <select
+                        [ngModel]="entrySubjectId(day, period.id)"
+                        (ngModelChange)="updateCell(day, period.id, $event)"
+                      >
+                        <option value="">Free period</option>
+                        @for (subject of classSubjects(); track subject.id) {
+                          <option [value]="subject.id">{{ subject.name }}</option>
+                        }
+                      </select>
+                      @if (entrySubjectId(day, period.id)) {
+                        <small>{{ teacherName(planner.subjectById(entrySubjectId(day, period.id))?.teacherId) }}</small>
+                      }
+                    </td>
+                  }
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="card editor-card">
+        <div class="section-heading">
+          <div>
+            <span class="eyebrow">Teacher view</span>
+            <h2>Teacher-wise timetable preview</h2>
+          </div>
+          <label class="toolbar-select">
+            <span>Teacher</span>
+            <select [(ngModel)]="selectedTeacherId">
+              @for (teacher of planner.teachers(); track teacher.id) {
+                <option [value]="teacher.id">{{ teacher.name }}</option>
+              }
+            </select>
+          </label>
+        </div>
+
+        <div class="table-wrap">
+          <table class="planner-table teacher-table">
+            <thead>
+              <tr>
+                <th>Period</th>
+                @for (day of days; track day) {
+                  <th>{{ day }}</th>
+                }
+              </tr>
+            </thead>
+            <tbody>
+              @for (period of periods; track period.id) {
+                <tr>
+                  <th>
+                    <strong>{{ period.shortLabel }}</strong>
+                    <span>{{ periodRange(period) }}</span>
+                  </th>
+                  @for (day of days; track day) {
+                    @let entry = teacherEntry(day, period.id);
+                    <td [class.conflict]="entry && teacherConflict(day, period.id)">
+                      @if (entry) {
+                        <strong>{{ subjectName(entry.subjectId) }}</strong>
+                        <small>{{ classLabel(entry.classId) }}</small>
+                        @if (teacherConflict(day, period.id)) {
+                          <span class="warning-tag">Conflict</span>
+                        }
+                      } @else {
+                        <span class="free-slot">Free</span>
+                      }
+                    </td>
+                  }
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </section>
+    }
+
+    @if (activeSection === 'analytics') {
+      <section class="analytics-grid">
+        <article class="card table-card">
+          <div class="section-heading compact">
+            <div>
+              <span class="eyebrow">Analytics</span>
+              <h2>Subject hours</h2>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Subject</th>
+                  <th>Class</th>
+                  <th>Teacher</th>
+                  <th>Target</th>
+                  <th>Scheduled</th>
+                  <th>Hours</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (item of subjectAnalytics(); track item.id) {
+                  <tr>
+                    <td>{{ item.subjectName }}</td>
+                    <td>{{ item.className }}</td>
+                    <td>{{ item.teacherName }}</td>
+                    <td>{{ item.targetPeriods }}</td>
+                    <td>{{ item.scheduledPeriods }}</td>
+                    <td>{{ item.scheduledHours | number:'1.1-1' }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </article>
+
+        <article class="card table-card">
+          <div class="section-heading compact">
+            <div>
+              <span class="eyebrow">Analytics</span>
+              <h2>Teacher workload</h2>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Teacher</th>
+                  <th>Classes</th>
+                  <th>Assigned</th>
+                  <th>Scheduled</th>
+                  <th>Hours</th>
+                  <th>Remaining</th>
+                  <th>Conflicts</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (item of teacherAnalytics(); track item.id) {
+                  <tr>
+                    <td>{{ item.teacherName }}</td>
+                    <td>{{ item.assignedClasses }}</td>
+                    <td>{{ item.assignedPeriods }}</td>
+                    <td>{{ item.scheduledPeriods }}</td>
+                    <td>{{ item.scheduledHours | number:'1.1-1' }}</td>
+                    <td>{{ item.remainingCapacity }}</td>
+                    <td>{{ item.conflictCount }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </article>
+      </section>
+    }
+
+  <!-- Teacher portal -->
+  } @else if (isTeacher()) {
+    <section class="teacher-focus">
+      <article class="card teacher-summary">
+        <div class="section-heading compact">
+          <div>
+            <span class="eyebrow">Teacher portal</span>
+            <h2>{{ selectedTeacherName() }}</h2>
+          </div>
+        </div>
+
+        @if (selectedTeacherMetrics(); as metrics) {
+          <div class="teacher-metrics">
+            <div>
+              <span>Scheduled</span>
+              <strong>{{ metrics.scheduledPeriods }}</strong>
+            </div>
+            <div>
+              <span>Hours</span>
+              <strong>{{ metrics.scheduledHours | number:'1.1-1' }}</strong>
+            </div>
+            <div>
+              <span>Remaining capacity</span>
+              <strong>{{ metrics.remainingCapacity }}</strong>
+            </div>
+          </div>
+        }
+      </article>
+
+      <article class="card editor-card">
+        <div class="section-heading compact">
+          <div>
+            <span class="eyebrow">Teacher portal</span>
+            <h2>Your weekly timetable</h2>
+          </div>
+        </div>
+
+        <div class="table-wrap">
+          <table class="planner-table teacher-table">
+            <thead>
+              <tr>
+                <th>Period</th>
+                @for (day of days; track day) {
+                  <th>{{ day }}</th>
+                }
+              </tr>
+            </thead>
+            <tbody>
+              @for (period of periods; track period.id) {
+                <tr>
+                  <th>
+                    <strong>{{ period.shortLabel }}</strong>
+                    <span>{{ periodRange(period) }}</span>
+                  </th>
+                  @for (day of days; track day) {
+                    @let entry = teacherEntry(day, period.id);
+                    <td [class.conflict]="entry && teacherConflict(day, period.id)">
+                      @if (entry) {
+                        <strong>{{ subjectName(entry.subjectId) }}</strong>
+                        <small>{{ classLabel(entry.classId) }}</small>
+                      } @else {
+                        <span class="free-slot">Free</span>
+                      }
+                    </td>
+                  }
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </article>
+    </section>
+  }
+
+</main>
