@@ -17,8 +17,8 @@ export class Login {
   private readonly router = inject(Router);
 
   protected loginRole: UserRole = 'admin';
-  protected loginEmail = 'admin@amups.com';
-  protected loginPassword = 'admin@amups';
+  protected loginEmail = '';
+  protected loginPassword = '';
   protected loading = signal(false);
 
   protected async login(): Promise<void> {

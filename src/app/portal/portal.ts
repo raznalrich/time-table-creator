@@ -37,6 +37,10 @@ export class Portal {
   protected selectedClassId = '';
   protected selectedTeacherId = '';
 
+  protected editingClassId: string | null = null;
+  protected editingTeacherId: string | null = null;
+  protected editingSubjectId: string | null = null;
+
   protected classDraft = {
     name: '',
     grade: '',
@@ -117,34 +121,65 @@ export class Portal {
   }
 
   protected async saveClass(): Promise<void> {
-    await this.planner.addClass({
-      ...this.classDraft,
-      strength: Number(this.classDraft.strength),
-    });
+    const input = { ...this.classDraft, strength: Number(this.classDraft.strength) };
+    if (this.editingClassId) {
+      await this.planner.updateClass(this.editingClassId, input);
+      this.editingClassId = null;
+    } else {
+      await this.planner.addClass(input);
+    }
+    this.classDraft = { name: '', grade: '', division: '', strength: 30, roomLabel: '' };
+  }
+
+  protected startEditClass(classroom: { id: string; name: string; grade: string; division: string; strength: number; roomLabel: string }): void {
+    this.editingClassId = classroom.id;
+    this.classDraft = { name: classroom.name, grade: classroom.grade, division: classroom.division, strength: classroom.strength, roomLabel: classroom.roomLabel };
+  }
+
+  protected cancelEditClass(): void {
+    this.editingClassId = null;
     this.classDraft = { name: '', grade: '', division: '', strength: 30, roomLabel: '' };
   }
 
   protected async deleteClass(classId: string): Promise<void> {
+    if (this.editingClassId === classId) this.cancelEditClass();
     await this.planner.deleteClass(classId);
   }
 
   protected async saveTeacher(): Promise<void> {
-    await this.planner.addTeacher({
-      ...this.teacherDraft,
-      weeklyCapacity: Number(this.teacherDraft.weeklyCapacity),
-    });
+    const input = { ...this.teacherDraft, weeklyCapacity: Number(this.teacherDraft.weeklyCapacity) };
+    if (this.editingTeacherId) {
+      await this.planner.updateTeacher(this.editingTeacherId, input);
+      this.editingTeacherId = null;
+    } else {
+      await this.planner.addTeacher(input);
+    }
+    this.teacherDraft = { name: '', email: '', teacherCode: '', weeklyCapacity: 30, password: 'teacher123' };
+  }
+
+  protected startEditTeacher(teacher: { id: string; name: string; email: string; teacherCode: string; weeklyCapacity: number; password?: string }): void {
+    this.editingTeacherId = teacher.id;
+    this.teacherDraft = { name: teacher.name, email: teacher.email, teacherCode: teacher.teacherCode, weeklyCapacity: teacher.weeklyCapacity, password: teacher.password ?? 'teacher123' };
+  }
+
+  protected cancelEditTeacher(): void {
+    this.editingTeacherId = null;
     this.teacherDraft = { name: '', email: '', teacherCode: '', weeklyCapacity: 30, password: 'teacher123' };
   }
 
   protected async deleteTeacher(teacherId: string): Promise<void> {
+    if (this.editingTeacherId === teacherId) this.cancelEditTeacher();
     await this.planner.deleteTeacher(teacherId);
   }
 
   protected async saveSubject(): Promise<void> {
-    await this.planner.addSubject({
-      ...this.subjectDraft,
-      weeklyPeriods: Number(this.subjectDraft.weeklyPeriods),
-    });
+    const input = { ...this.subjectDraft, weeklyPeriods: Number(this.subjectDraft.weeklyPeriods) };
+    if (this.editingSubjectId) {
+      await this.planner.updateSubject(this.editingSubjectId, input);
+      this.editingSubjectId = null;
+    } else {
+      await this.planner.addSubject(input);
+    }
     this.subjectDraft = {
       name: '',
       classId: this.selectedClassId,
@@ -154,7 +189,18 @@ export class Portal {
     };
   }
 
+  protected startEditSubject(subject: { id: string; name: string; classId: string; teacherId: string; color: string; weeklyPeriods: number }): void {
+    this.editingSubjectId = subject.id;
+    this.subjectDraft = { name: subject.name, classId: subject.classId, teacherId: subject.teacherId, color: subject.color, weeklyPeriods: subject.weeklyPeriods };
+  }
+
+  protected cancelEditSubject(): void {
+    this.editingSubjectId = null;
+    this.subjectDraft = { name: '', classId: this.selectedClassId, teacherId: this.planner.teachers()[0]?.id ?? '', color: '#0ea5e9', weeklyPeriods: 5 };
+  }
+
   protected async deleteSubject(subjectId: string): Promise<void> {
+    if (this.editingSubjectId === subjectId) this.cancelEditSubject();
     await this.planner.deleteSubject(subjectId);
   }
 

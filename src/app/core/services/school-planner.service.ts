@@ -1,5 +1,5 @@
 import { Injectable, computed, signal } from '@angular/core';
-import { getAuth, signInWithEmailAndPassword, signOut } from 'firebase/auth';
+import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { doc, getDoc, getFirestore, setDoc } from 'firebase/firestore';
 import { getFirebaseApp } from '../utils/firebase-app';
 import {
@@ -19,10 +19,8 @@ import {
   TIMETABLE_PERIODS,
 } from '../../shared/models/school.model';
 
-const STORAGE_KEY = 'ttc-school-data-v1';
-const SESSION_KEY = 'ttc-session-v1';
 const REMOTE_DOCUMENT_PATH = 'schools/default';
-const ADMIN_EMAIL = 'admin@amups.com';
+const ADMIN_EMAIL = 'admin2026@amups.com';
 const ADMIN_PASSWORD = 'admin@amups';
 
 @Injectable({
@@ -145,6 +143,8 @@ export class SchoolPlannerService {
     const normalizedEmail = email.trim().toLowerCase();
 
     if (this.auth) {
+      // Firebase is configured — all logins MUST go through Firebase Auth so that
+      // Firestore writes carry a valid auth token and actually reach the server.
       try {
         const credential = await signInWithEmailAndPassword(this.auth, normalizedEmail, password);
 
@@ -178,18 +178,12 @@ export class SchoolPlannerService {
         return;
       } catch (error) {
         const msg = error instanceof Error ? error.message : '';
-        // Firebase auth errors (invalid-credential, user-not-found, etc.) — fall through
-        // to local/demo credential check below so the app works before Firebase Auth is
-        // fully configured. Any other error (profile / role mismatch) is already handled
-        // above with an explicit return, so only Firebase SDK errors reach here.
-        if (!msg.includes('auth/')) {
-          this.errorMessage.set(msg || 'Firebase login failed.');
-          return;
-        }
+        this.errorMessage.set(msg || 'Login failed. Please check your credentials.');
+        return;
       }
     }
 
-    // Fallback: local seed / demo credentials
+    // Firebase is NOT configured — allow local demo credentials for development only
     const demoUser = this.resolveDemoUser(normalizedEmail, password, role);
     if (!demoUser) {
       this.errorMessage.set('Invalid credentials. Please check your email and password.');
@@ -205,12 +199,18 @@ export class SchoolPlannerService {
     }
 
     this.currentUser.set(null);
-    localStorage.removeItem(SESSION_KEY);
   }
 
   async addClass(input: Omit<ClassRecord, 'id'>): Promise<void> {
     const nextClass: ClassRecord = { id: createId('class'), ...input };
     await this.updateData((current) => ({ ...current, classes: [...current.classes, nextClass] }));
+  }
+
+  async updateClass(id: string, input: Omit<ClassRecord, 'id'>): Promise<void> {
+    await this.updateData((current) => ({
+      ...current,
+      classes: current.classes.map((c) => c.id === id ? { id, ...input } : c),
+    }));
   }
 
   async deleteClass(classId: string): Promise<void> {
@@ -230,6 +230,13 @@ export class SchoolPlannerService {
     await this.updateData((current) => ({ ...current, teachers: [...current.teachers, nextTeacher] }));
   }
 
+  async updateTeacher(id: string, input: Omit<TeacherRecord, 'id'>): Promise<void> {
+    await this.updateData((current) => ({
+      ...current,
+      teachers: current.teachers.map((t) => t.id === id ? { id, ...input } : t),
+    }));
+  }
+
   async deleteTeacher(teacherId: string): Promise<void> {
     await this.updateData((current) => {
       const subjectIds = new Set(current.subjects.filter(s => s.teacherId === teacherId).map(s => s.id));
@@ -245,6 +252,13 @@ export class SchoolPlannerService {
   async addSubject(input: Omit<SubjectRecord, 'id'>): Promise<void> {
     const nextSubject: SubjectRecord = { id: createId('subject'), ...input };
     await this.updateData((current) => ({ ...current, subjects: [...current.subjects, nextSubject] }));
+  }
+
+  async updateSubject(id: string, input: Omit<SubjectRecord, 'id'>): Promise<void> {
+    await this.updateData((current) => ({
+      ...current,
+      subjects: current.subjects.map((s) => s.id === id ? { id, ...input } : s),
+    }));
   }
 
   async deleteSubject(subjectId: string): Promise<void> {
@@ -415,9 +429,15 @@ export class SchoolPlannerService {
 
   private async initialize(): Promise<void> {
     try {
+      // Auth must be restored BEFORE reading Firestore so security rules pass
+      await this.restoreSession();
       const data = await this.loadSchoolData();
       this.data.set(data);
-      this.restoreSession(data);
+      // Invalidate teacher session if that teacher no longer exists in the loaded data
+      const user = this.currentUser();
+      if (user?.role === 'teacher' && user.teacherId && !data.teachers.some((t) => t.id === user.teacherId)) {
+        this.currentUser.set(null);
+      }
     } catch (error) {
       this.errorMessage.set(error instanceof Error ? error.message : 'Failed to load the school planner.');
     } finally {
@@ -426,33 +446,19 @@ export class SchoolPlannerService {
   }
 
   private async loadSchoolData(): Promise<SchoolData> {
-    // Always prefer Firestore when available
-    if (this.firestore) {
-      try {
-        const snapshot = await getDoc(doc(this.firestore, REMOTE_DOCUMENT_PATH));
-        if (snapshot.exists()) {
-          // Clear any stale local cache so old seed data never bleeds back in
-          localStorage.removeItem(STORAGE_KEY);
-          return normalizeSchoolData(snapshot.data() as Partial<SchoolData>);
-        }
-        // Document doesn't exist yet — start empty and let the admin populate it
-        localStorage.removeItem(STORAGE_KEY);
-        return this.emptyData;
-      } catch (error) {
-        this.errorMessage.set(error instanceof Error ? error.message : 'Unable to reach Firebase.');
-      }
-    }
-
-    // Offline fallback: use cached data, never inject seed data
-    const cached = localStorage.getItem(STORAGE_KEY);
-    if (!cached) {
+    if (!this.firestore) {
       return this.emptyData;
     }
 
     try {
-      return normalizeSchoolData(JSON.parse(cached) as Partial<SchoolData>);
-    } catch {
-      localStorage.removeItem(STORAGE_KEY);
+      const snapshot = await getDoc(doc(this.firestore, REMOTE_DOCUMENT_PATH));
+      if (snapshot.exists()) {
+        return normalizeSchoolData(snapshot.data() as Partial<SchoolData>);
+      }
+      // Document doesn't exist yet — start empty and let the admin populate it
+      return this.emptyData;
+    } catch (error) {
+      this.errorMessage.set(error instanceof Error ? error.message : 'Unable to reach Firebase.');
       return this.emptyData;
     }
   }
@@ -509,28 +515,30 @@ export class SchoolPlannerService {
     };
   }
 
-  private restoreSession(data: SchoolData): void {
-    const cached = localStorage.getItem(SESSION_KEY);
-    if (!cached) {
+  private async restoreSession(): Promise<void> {
+    if (!this.auth) {
       return;
     }
 
-    try {
-      const user = JSON.parse(cached) as PortalUser;
-      if (user.role === 'teacher' && user.teacherId && !data.teachers.some((teacher) => teacher.id === user.teacherId)) {
-        localStorage.removeItem(SESSION_KEY);
-        return;
-      }
+    await new Promise<void>((resolve) => {
+      const unsubscribe = onAuthStateChanged(this.auth!, async (firebaseUser) => {
+        unsubscribe();
+        if (!firebaseUser) {
+          resolve();
+          return;
+        }
 
-      this.currentUser.set(user);
-    } catch {
-      localStorage.removeItem(SESSION_KEY);
-    }
+        const profile = await this.fetchRemoteUserProfile(firebaseUser.uid);
+        if (profile) {
+          this.currentUser.set(profile);
+        }
+        resolve();
+      });
+    });
   }
 
   private persistSession(user: PortalUser): void {
     this.currentUser.set(user);
-    localStorage.setItem(SESSION_KEY, JSON.stringify(user));
   }
 
   private async updateData(mutator: (current: SchoolData) => SchoolData): Promise<void> {
@@ -542,7 +550,6 @@ export class SchoolPlannerService {
   private async persistSchoolData(data: SchoolData): Promise<void> {
     this.isSaving.set(true);
     this.errorMessage.set('');
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
 
     if (this.firestore) {
       try {

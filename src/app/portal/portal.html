@@ -94,7 +94,7 @@
           <div class="section-heading compact">
             <div>
               <span class="eyebrow">Setup</span>
-              <h2>Add class and division</h2>
+              <h2>{{ editingClassId ? 'Edit class' : 'Add class and division' }}</h2>
             </div>
           </div>
           <div class="form-grid">
@@ -119,14 +119,19 @@
               <input [(ngModel)]="classDraft.roomLabel" placeholder="Block C - 21" />
             </label>
           </div>
-          <button type="button" class="primary-button" (click)="saveClass()">Add class</button>
+          <div class="form-actions">
+            <button type="button" class="primary-button" (click)="saveClass()">{{ editingClassId ? 'Save changes' : 'Add class' }}</button>
+            @if (editingClassId) {
+              <button type="button" class="ghost-button" (click)="cancelEditClass()">Cancel</button>
+            }
+          </div>
         </article>
 
         <article class="card form-card">
           <div class="section-heading compact">
             <div>
               <span class="eyebrow">Setup</span>
-              <h2>Add teacher login</h2>
+              <h2>{{ editingTeacherId ? 'Edit teacher' : 'Add teacher login' }}</h2>
             </div>
           </div>
           <div class="form-grid">
@@ -151,14 +156,19 @@
               <input [(ngModel)]="teacherDraft.password" type="text" placeholder="teacher123" />
             </label>
           </div>
-          <button type="button" class="primary-button" (click)="saveTeacher()">Add teacher</button>
+          <div class="form-actions">
+            <button type="button" class="primary-button" (click)="saveTeacher()">{{ editingTeacherId ? 'Save changes' : 'Add teacher' }}</button>
+            @if (editingTeacherId) {
+              <button type="button" class="ghost-button" (click)="cancelEditTeacher()">Cancel</button>
+            }
+          </div>
         </article>
 
         <article class="card form-card">
           <div class="section-heading compact">
             <div>
               <span class="eyebrow">Setup</span>
-              <h2>Add subject and allot teacher</h2>
+              <h2>{{ editingSubjectId ? 'Edit subject' : 'Add subject and allot teacher' }}</h2>
             </div>
           </div>
           <div class="form-grid">
@@ -191,7 +201,12 @@
               <input [(ngModel)]="subjectDraft.color" type="color" />
             </label>
           </div>
-          <button type="button" class="primary-button" (click)="saveSubject()">Add subject</button>
+          <div class="form-actions">
+            <button type="button" class="primary-button" (click)="saveSubject()">{{ editingSubjectId ? 'Save changes' : 'Add subject' }}</button>
+            @if (editingSubjectId) {
+              <button type="button" class="ghost-button" (click)="cancelEditSubject()">Cancel</button>
+            }
+          </div>
         </article>
       </section>
 
@@ -205,11 +220,12 @@
           </div>
           <div class="simple-list">
             @for (classroom of planner.classes(); track classroom.id) {
-              <div class="simple-row">
+              <div class="simple-row" [class.editing]="editingClassId === classroom.id">
                 <div class="row-info">
                   <strong>{{ classLabel(classroom.id) }}</strong>
                   <span>{{ classroom.strength }} students · {{ classroom.roomLabel }}</span>
                 </div>
+                <button type="button" class="edit-button" title="Edit class" (click)="startEditClass(classroom)">✎</button>
                 <button type="button" class="delete-button" title="Delete class" (click)="deleteClass(classroom.id)">✕</button>
               </div>
             }
@@ -225,11 +241,12 @@
           </div>
           <div class="simple-list">
             @for (teacher of planner.teachers(); track teacher.id) {
-              <div class="simple-row">
+              <div class="simple-row" [class.editing]="editingTeacherId === teacher.id">
                 <div class="row-info">
                   <strong>{{ teacher.name }}</strong>
                   <span>{{ teacher.teacherCode }} · {{ teacher.email }}</span>
                 </div>
+                <button type="button" class="edit-button" title="Edit teacher" (click)="startEditTeacher(teacher)">✎</button>
                 <button type="button" class="delete-button" title="Delete teacher" (click)="deleteTeacher(teacher.id)">✕</button>
               </div>
             }
@@ -245,12 +262,13 @@
           </div>
           <div class="simple-list">
             @for (subject of planner.subjects(); track subject.id) {
-              <div class="simple-row">
+              <div class="simple-row" [class.editing]="editingSubjectId === subject.id">
                 <span class="subject-dot" [style.background]="subject.color"></span>
                 <div class="row-info">
                   <strong>{{ subject.name }}</strong>
                   <span>{{ classLabel(subject.classId) }} · {{ teacherName(subject.teacherId) }} · {{ subject.weeklyPeriods }}×/wk</span>
                 </div>
+                <button type="button" class="edit-button" title="Edit subject" (click)="startEditSubject(subject)">✎</button>
                 <button type="button" class="delete-button" title="Delete subject" (click)="deleteSubject(subject.id)">✕</button>
               </div>
             }
