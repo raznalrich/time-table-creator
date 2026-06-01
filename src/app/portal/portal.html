@@ -200,6 +200,10 @@
               <span>Colour</span>
               <input [(ngModel)]="subjectDraft.color" type="color" />
             </label>
+            <label class="wide-field checkbox-label">
+              <input [(ngModel)]="subjectDraft.firstPeriodOnly" type="checkbox" />
+              <span>First period priority — always schedule in P1</span>
+            </label>
           </div>
           <div class="form-actions">
             <button type="button" class="primary-button" (click)="saveSubject()">{{ editingSubjectId ? 'Save changes' : 'Add subject' }}</button>
@@ -268,6 +272,9 @@
                   <strong>{{ subject.name }}</strong>
                   <span>{{ classLabel(subject.classId) }} · {{ teacherName(subject.teacherId) }} · {{ subject.weeklyPeriods }}×/wk</span>
                 </div>
+                @if (subject.firstPeriodOnly) {
+                  <span class="priority-badge">P1</span>
+                }
                 <button type="button" class="edit-button" title="Edit subject" (click)="startEditSubject(subject)">✎</button>
                 <button type="button" class="delete-button" title="Delete subject" (click)="deleteSubject(subject.id)">✕</button>
               </div>

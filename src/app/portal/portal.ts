@@ -63,6 +63,7 @@ export class Portal {
     teacherId: '',
     color: '#0ea5e9',
     weeklyPeriods: 5,
+    firstPeriodOnly: false,
   };
 
   constructor() {
@@ -186,17 +187,18 @@ export class Portal {
       teacherId: this.planner.teachers()[0]?.id ?? '',
       color: '#0ea5e9',
       weeklyPeriods: 5,
+      firstPeriodOnly: false,
     };
   }
 
-  protected startEditSubject(subject: { id: string; name: string; classId: string; teacherId: string; color: string; weeklyPeriods: number }): void {
+  protected startEditSubject(subject: { id: string; name: string; classId: string; teacherId: string; color: string; weeklyPeriods: number; firstPeriodOnly?: boolean }): void {
     this.editingSubjectId = subject.id;
-    this.subjectDraft = { name: subject.name, classId: subject.classId, teacherId: subject.teacherId, color: subject.color, weeklyPeriods: subject.weeklyPeriods };
+    this.subjectDraft = { name: subject.name, classId: subject.classId, teacherId: subject.teacherId, color: subject.color, weeklyPeriods: subject.weeklyPeriods, firstPeriodOnly: subject.firstPeriodOnly ?? false };
   }
 
   protected cancelEditSubject(): void {
     this.editingSubjectId = null;
-    this.subjectDraft = { name: '', classId: this.selectedClassId, teacherId: this.planner.teachers()[0]?.id ?? '', color: '#0ea5e9', weeklyPeriods: 5 };
+    this.subjectDraft = { name: '', classId: this.selectedClassId, teacherId: this.planner.teachers()[0]?.id ?? '', color: '#0ea5e9', weeklyPeriods: 5, firstPeriodOnly: false };
   }
 
   protected async deleteSubject(subjectId: string): Promise<void> {

@@ -51,6 +51,7 @@ export interface SubjectRecord {
   teacherId: string;
   color: string;
   weeklyPeriods: number;
+  firstPeriodOnly?: boolean;
 }
 
 export interface TimetableEntry {

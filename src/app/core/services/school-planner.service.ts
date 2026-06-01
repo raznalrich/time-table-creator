@@ -324,12 +324,10 @@ export class SchoolPlannerService {
     // Global: which (day, periodId) slots each teacher already owns
     const teacherBusy = new Map<string, Set<string>>();
 
-    // Diagonal-ordered candidate slots: P1-Mon, P2-Tue, P3-Wed, P4-Thu, P5-Fri,
-    // P6-Mon, P7-Tue, P8-Wed, P1-Thu … This ensures successive assignments for
-    // the same subject hit different days.
-    const nDays    = SCHOOL_DAYS.length;       // 5
-    const nPeriods = TIMETABLE_PERIODS.length; // 8
-    const total    = nDays * nPeriods;         // 40
+    // Diagonal-ordered candidate slots for normal scheduling
+    const nDays    = SCHOOL_DAYS.length;
+    const nPeriods = TIMETABLE_PERIODS.length;
+    const total    = nDays * nPeriods;
     const orderedSlots: { day: DayKey; periodId: string }[] = [];
     for (let i = 0; i < total; i++) {
       const pIdx = i % nPeriods;
@@ -337,16 +335,25 @@ export class SchoolPlannerService {
       orderedSlots.push({ day: SCHOOL_DAYS[dIdx], periodId: TIMETABLE_PERIODS[pIdx].id });
     }
 
+    // First-period-only slots: P1 on each day (Monday–Friday)
+    const firstPeriodSlots: { day: DayKey; periodId: string }[] = SCHOOL_DAYS.map(
+      (day) => ({ day, periodId: TIMETABLE_PERIODS[0].id }),
+    );
+
     const newEntries: TimetableEntry[] = [];
 
     for (const classroom of data.classes) {
       const subjects = data.subjects.filter((s) => s.classId === classroom.id);
       if (subjects.length === 0) continue;
 
-      // Pool: each subject repeated weeklyPeriods times, heaviest first
+      // Pool: priority subjects first (firstPeriodOnly), then by descending weeklyPeriods
       const pool: SubjectRecord[] = subjects
         .slice()
-        .sort((a, b) => b.weeklyPeriods - a.weeklyPeriods)
+        .sort((a, b) => {
+          if (a.firstPeriodOnly && !b.firstPeriodOnly) return -1;
+          if (!a.firstPeriodOnly && b.firstPeriodOnly) return 1;
+          return b.weeklyPeriods - a.weeklyPeriods;
+        })
         .flatMap((s) => Array.from({ length: s.weeklyPeriods }, () => s));
 
       const classSlotUsed = new Set<string>();
@@ -357,7 +364,10 @@ export class SchoolPlannerService {
         }
         const teacherSlots = teacherBusy.get(subject.teacherId)!;
 
-        for (const slot of orderedSlots) {
+        // Priority subjects only get P1 slots; normal subjects use the diagonal order
+        const candidateSlots = subject.firstPeriodOnly ? firstPeriodSlots : orderedSlots;
+
+        for (const slot of candidateSlots) {
           const key = `${slot.day}-${slot.periodId}`;
           if (classSlotUsed.has(key)) continue;
           if (teacherSlots.has(key)) continue;
@@ -626,6 +636,7 @@ function normalizeSubject(value: Partial<SubjectRecord>): SubjectRecord {
     teacherId: String(value.teacherId ?? ''),
     color: String(value.color ?? '#3B82F6'),
     weeklyPeriods: Number(value.weeklyPeriods ?? 0),
+    firstPeriodOnly: Boolean(value.firstPeriodOnly ?? false),
   };
 }
 

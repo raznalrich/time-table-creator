@@ -419,6 +419,36 @@ button {
   align-items: center;
 }
 
+.checkbox-label {
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  font-weight: 600;
+  cursor: pointer;
+
+  input[type="checkbox"] {
+    width: 18px;
+    min-height: 18px;
+    height: 18px;
+    border-radius: 6px;
+    flex-shrink: 0;
+    cursor: pointer;
+  }
+
+  span { color: var(--ink); }
+}
+
+.priority-badge {
+  flex-shrink: 0;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 800;
+  background: rgba(234, 179, 8, 0.15);
+  color: #92400e;
+  letter-spacing: 0.05em;
+}
+
 /* ── Table toolbar ──────────────────────────── */
 .toolbar-select { min-width: 220px; }
 
